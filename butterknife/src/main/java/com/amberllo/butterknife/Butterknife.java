@@ -9,9 +9,21 @@ import java.util.Map;
 
 public class Butterknife {
 
-    static Map<String, ? extends ViewBinder> BINDERS = new LinkedHashMap<>();
+    static Map<String, ViewBinder> BINDERS = new LinkedHashMap<>();
 
     public static void bind(Activity target){
+        String viewBinderName = target.getClass().getName() +"$$ViewBinder";
+        ViewBinder binder = BINDERS.get(viewBinderName);
+        if(binder == null){
+            try {
+                Class clz =  Class.forName(viewBinderName);
+                binder = (ViewBinder) clz.newInstance();
+                BINDERS.put(viewBinderName, binder);
+            }catch (Exception e){
 
+            }
+
+        }
+        binder.bind(target);
     }
 }

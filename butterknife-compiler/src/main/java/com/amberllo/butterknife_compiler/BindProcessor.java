@@ -1,12 +1,14 @@
 package com.amberllo.butterknife_compiler;
 
 import com.amberllo.butterknife_annotation.BindView;
+import com.amberllo.butterknife_annotation.ViewBinder;
 import com.google.auto.service.AutoService;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeSpec;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -86,9 +88,7 @@ public class BindProcessor extends AbstractProcessor {
 
     public void makeFile(String tag, List<Element> elements) {
         try {
-//            String packageName = "com.amberllo.butterknife.app";
-////            String className = "MainActivity$$ViewBinder";
-//
+
             TypeElement typeElement = elementUtils.getTypeElement(tag);
 
             ClassName className = ClassName.get(typeElement);
@@ -97,17 +97,27 @@ public class BindProcessor extends AbstractProcessor {
             String clazzName = className.simpleName();
             String packageName = className.packageName();
 
+            String clazzFullName = className.reflectionName();
 
-            MethodSpec main = MethodSpec.methodBuilder("main")
-                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                    .returns(void.class)
-                    .addParameter(String[].class, "args")
-                    .addStatement("$T.out.println($S)", System.class, "Hello, JavaPoet!")
-                    .build();
-//
-            TypeSpec activityClass = TypeSpec.classBuilder(clazzName + "$$ViewBinder")
+            MethodSpec.Builder bindMethodBuilder = MethodSpec.methodBuilder("bind")
                     .addModifiers(Modifier.PUBLIC)
-                    .addMethod(main)
+                    .returns(void.class)
+                    .addParameter(Object.class, "target")
+                    .addAnnotation(Override.class)
+                    .addCode("  "+clazzFullName + " activity = (" + clazzFullName + ")target; \n");
+
+            for (Element element : elements) {
+                String varName = element.getSimpleName().toString();
+                BindView annotation = element.getAnnotation(BindView.class);
+                int viewId = annotation.value();
+                bindMethodBuilder.addCode("  activity."+varName+" = activity.findViewById("+viewId+");\n");
+            }
+
+
+            TypeSpec activityClass = TypeSpec.classBuilder(clazzName + "$$ViewBinder")
+                    .addSuperinterface(ViewBinder.class)
+                    .addModifiers(Modifier.PUBLIC)
+                    .addMethod(bindMethodBuilder.build())
                     .build();
 
             JavaFile javaFile = JavaFile.builder(packageName, activityClass).build();
