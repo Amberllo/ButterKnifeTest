@@ -8,7 +8,6 @@ import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeSpec;
 
-import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,21 +21,19 @@ import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedAnnotationTypes;
+
 import javax.lang.model.element.Element;
 import javax.lang.model.element.Modifier;
-import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
-import javax.tools.Diagnostic;
 
-@SupportedAnnotationTypes("com.amberllo.butterknife_annotation.BindView")
+
 @AutoService(Processor.class)
 public class BindProcessor extends AbstractProcessor {
 
-    Filer filer;
-    Messager messager;
-    Elements elementUtils;
+    private Filer filer;
+    private Messager messager;
+    private Elements elementUtils;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -50,11 +47,29 @@ public class BindProcessor extends AbstractProcessor {
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 
-        Map<String/** qualifiedName */, List<Element>> bindViews = new HashMap<>();
+        /**
+         * key: activity的完整命名空间
+         * value: 注释信息
+         * */
+        Map<String, List<Element>> bindViews = makeData(roundEnv);
 
+        //生成文件
+        makeFile(bindViews);
 
+        return false;
+    }
+
+    @Override
+    public Set<String> getSupportedAnnotationTypes() {
+        Set<String> set = new HashSet<>();
+        set.add(BindView.class.getName());
+        return set;
+    }
+
+    private Map<String, List<Element>> makeData(RoundEnvironment roundEnv) {
+
+        Map<String, List<Element>> bindViews = new HashMap<>();
         Set<? extends Element> bindViewElements = roundEnv.getElementsAnnotatedWith(BindView.class);
-
         for (Element element : bindViewElements) {
 
             TypeElement classElement = (TypeElement) element.getEnclosingElement();
@@ -68,32 +83,23 @@ public class BindProcessor extends AbstractProcessor {
             }
             list.add(element);
         }
+        return bindViews;
+    }
 
 
+    private void makeFile(Map<String, List<Element>> bindViews) {
         for (Map.Entry<String, List<Element>> entry : bindViews.entrySet()) {
             String className = entry.getKey(); //Activity类名
             List<Element> elements = entry.getValue(); //Activity 里面的注解元素
             makeFile(className, elements);
         }
-
-        return false;
     }
 
-    @Override
-    public Set<String> getSupportedAnnotationTypes() {
-        Set<String> set = new HashSet<>();
-        set.add(BindView.class.getName());
-        return set;
-    }
-
-    public void makeFile(String tag, List<Element> elements) {
+    private void makeFile(String tag, List<Element> elements) {
         try {
 
             TypeElement typeElement = elementUtils.getTypeElement(tag);
-
             ClassName className = ClassName.get(typeElement);
-
-
             String clazzName = className.simpleName();
             String packageName = className.packageName();
 
@@ -104,13 +110,13 @@ public class BindProcessor extends AbstractProcessor {
                     .returns(void.class)
                     .addParameter(Object.class, "target")
                     .addAnnotation(Override.class)
-                    .addCode("  "+clazzFullName + " activity = (" + clazzFullName + ")target; \n");
+                    .addCode("  " + clazzFullName + " activity = (" + clazzFullName + ")target; \n");
 
             for (Element element : elements) {
                 String varName = element.getSimpleName().toString();
                 BindView annotation = element.getAnnotation(BindView.class);
                 int viewId = annotation.value();
-                bindMethodBuilder.addCode("  activity."+varName+" = activity.findViewById("+viewId+");\n");
+                bindMethodBuilder.addCode("  activity." + varName + " = activity.findViewById(" + viewId + ");\n");
             }
 
 
